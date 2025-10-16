@@ -1,0 +1,52 @@
+name: Build Windows x64
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    strategy:
+      matrix:
+        configuration: [Release, Release-static]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+    
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: 'c8696863d371ab7f46e213d8f5ca923c4aef2a00'
+    
+    - name: Restore NuGet packages
+      run: nuget restore sguard_limit.sln
+    
+    - name: Build solution
+      run: msbuild sguard_limit.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /m /v:minimal
+    
+    - name: Upload artifacts - sguard_limit
+      uses: actions/upload-artifact@v4
+      with:
+        name: sguard_limit-${{ matrix.configuration }}-x64
+        path: |
+          x64/${{ matrix.configuration }}/Hutao.exe
+          x64/${{ matrix.configuration }}/*.pdb
+        if-no-files-found: warn
+    
+    - name: Upload artifacts - SGuardLimit_VMIO
+      uses: actions/upload-artifact@v4
+      with:
+        name: SGuardLimit_VMIO-${{ matrix.configuration }}-x64
+        path: |
+          x64/${{ matrix.configuration }}/SGuardLimit_VMIO.sys
+          x64/${{ matrix.configuration }}/*.pdb
+        if-no-files-found: warn
