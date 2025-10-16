@@ -141,7 +141,16 @@ result_t KernelDriver::init(std::string loadPath) {
 	}
 
 	if (status != ERROR_SUCCESS) {
-		if (IDYES == MessageBox(NULL, __FUNCTION__ "(): 创建注册表项失败，你可能需要手动安装证书。\n要打开证书下载页面么？", "注意", MB_YESNO)) {
+		if (IDYES == MessageBox(NULL, 
+			__FUNCTION__ "(): 导入驱动证书到注册表失败。
+
+"
+			"这可能影响驱动加载，但可以尝试继续。
+"
+			"如果后续驱动启动失败，请手动安装证书。
+
+"
+			"要打开证书下载页面吗?", "证书安装提示", MB_YESNO)) {
 			ShellExecute(0, "open", "https://pan.baidu.com/s/1wAShvyh1Qff7t7VgrY7MXg?pwd=si6r", 0, 0, SW_SHOW);
 		}
 	}
@@ -184,7 +193,18 @@ result_t KernelDriver::load() {
 		hDriver = CreateFile("\\\\.\\" DRIVER_NAME, GENERIC_ALL, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
 
 		if (hDriver == INVALID_HANDLE_VALUE) {
-			return unexpected_error(__FUNCTION__ "(): CreateFile失败。", GetLastError());
+			DWORD error = GetLastError();
+			return unexpected_error(format(
+				__FUNCTION__ "(): 无法打开驱动设备句柄。\n\n"
+				"可能的原因:\n"
+				"1. 驱动服务已启动但设备未正确创建。\n"
+				"2. 另一个程序实例正在使用该驱动。\n"
+				"3. 驱动加载失败，但服务状态显示为已启动。\n\n"
+				"解决方法:\n"
+				"- 关闭所有程序实例后重新启动。\n"
+				"- 重启计算机以清理驱动状态。\n"
+				"- 使用sc delete Hutao命令删除服务后重试。\n\n"
+				"错误代码: 0x{:08X}", error), error);
 		}
 	}
 
@@ -394,22 +414,47 @@ result_t KernelDriver::_extractResource() {
 
 	HRSRC hRsrc = FindResource(NULL, MAKEINTRESOURCE(DRIVER), "RES");
 	if (hRsrc == NULL) {
-		return unexpected_error(format(__FUNCTION__ "(): FindResource失败。\n\n{}", _strUserManual()), GetLastError());
+		DWORD error = GetLastError();
+		return unexpected_error(format(
+			__FUNCTION__ "(): 无法提取内嵌驱动资源失败。\n\n"
+			"可能的原因:\n"
+			"1. 应用程序文件不完整，杀毒软件或防火墙删除了内部嵌入文件\n"
+			"2. 破解版可能存在内存错误，请重新获取完整程序，或者及时反馈到QQ群: 775176979\n"
+			"3. 下载损坏，程序文件已经损坏，请换一个来源重新下载。\n\n"
+			"错误代码: 0x{:08X}\n\n{}", error, _strUserManual()), error);
 	}
 
 	DWORD rcSize = SizeofResource(NULL, hRsrc);
 	if (rcSize <= 0) {
-		return unexpected_error(format(__FUNCTION__ "(): SizeofResource失败。\n\n{}", _strUserManual()), GetLastError());
+		DWORD error = GetLastError();
+		return unexpected_error(format(
+			__FUNCTION__ "(): 获取资源文件大小失败(文件大小为0: {}字节)。\n\n"
+			"可能的原因:\n"
+			"1. 破解版可能存在内存错误，请重新获取完整程序，或者及时反馈到QQ群: 775176979\n"
+			"2. 应用程序文件编译时有问题，请换一个来源重新下载。\n\n"
+			"错误代码: 0x{:08X}\n\n{}", rcSize, error, _strUserManual()), error);
 	}
 
 	HGLOBAL hGlobal = LoadResource(NULL, hRsrc);
 	if (hGlobal == NULL) {
-		return unexpected_error(format(__FUNCTION__ "(): LoadResource失败。\n\n{}", _strUserManual()), GetLastError());
+		DWORD error = GetLastError();
+		return unexpected_error(format(
+			__FUNCTION__ "(): 加载资源失败。\n\n"
+			"可能的原因:\n"
+			"1. 系统内存不足，请关闭部分程序后重新尝试。\n"
+			"2. 破解版可能存在内存错误，请重新获取完整程序，或者及时反馈到QQ群: 775176979\n\n"
+			"错误代码: 0x{:08X}\n\n{}", error, _strUserManual()), error);
 	}
 
 	LPVOID rcBuf = LockResource(hGlobal);
 	if (rcBuf == NULL) {
-		return unexpected_error(format(__FUNCTION__ "(): LockResource失败。\n\n{}", _strUserManual()), GetLastError());
+		DWORD error = GetLastError();
+		return unexpected_error(format(
+			__FUNCTION__ "(): 锁定资源失败。\n\n"
+			"可能的原因:\n"
+			"1. 系统内存不足，请关闭部分程序后重新尝试。\n"
+			"2. 破解版可能存在内存错误，请重新获取完整程序，或者及时反馈到QQ群: 775176979\n\n"
+			"错误代码: 0x{:08X}\n\n{}", error, _strUserManual()), error);
 	}
 
 	if (auto fp = fopen(sysfile_LoadPath.c_str(), "wb")) {
@@ -419,7 +464,15 @@ result_t KernelDriver::_extractResource() {
 	} else {
 		// we can use GetLastError() rather than errno, on some windows C runtime error handling.
 		// when we call fopen, she will turn to CreateFile(), which will set GetLastError() in win32 mode.
-		return unexpected_error(format(__FUNCTION__ "(): fopen失败。\n\n{}", _strUserManual()), GetLastError());
+		DWORD error = GetLastError();
+		return unexpected_error(format(
+			__FUNCTION__ "(): 无法保存内核驱动文件到目标路径。\n"
+			"目标路径：{}\n\n"
+			"可能的原因:\n"
+			"1. 没有管理员权限，请右键程序选择\"以管理员身份运行\"。\n"
+			"2. 目标目录不存在或没有写入权限，可能是Defender或其他杀毒软件对该目录启用了\"实时保护\"。\n"
+			"3. 系统磁盘已满或无法写入文件，请及时反馈到QQ群: 775176979\n\n"
+			"错误代码: 0x{:08X}\n\n{}", sysfile_LoadPath, error, _strUserManual()), error);
 	}
 
 	return true;
@@ -448,7 +501,14 @@ result_t KernelDriver::_startService() {
 	// open SCM.
 	hSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
 	if (!hSCManager) {
-		return unexpected_error(__FUNCTION__ "(): OpenSCManager失败。", GetLastError());
+		DWORD error = GetLastError();
+		return unexpected_error(format(
+			__FUNCTION__ "(): 无法打开服务控制管理器。\n\n"
+			"可能的原因:\n"
+			"1. 没有管理员权限，请右键程序选择\"以管理员身份运行\"。\n"
+			"2. 系统服务控制管理器未启动或被禁用，请重启。\n"
+			"3. 系统处于异常状态，建议重启计算机后重新尝试。\n\n"
+			"错误代码: 0x{:08X}", error), error);
 	}
 
 	// open Service.
@@ -460,7 +520,18 @@ result_t KernelDriver::_startService() {
 			sysfile_LoadPath.c_str() /* no quote */ , NULL, NULL, NULL, NULL, NULL);
 
 		if (!hService) {
-			return unexpected_error(__FUNCTION__ "(): CreateService失败。", GetLastError());
+			DWORD error = GetLastError();
+			return unexpected_error(format(
+				__FUNCTION__ "(): 无法创建内核驱动服务。\n\n"
+				"可能的原因:\n"
+				"1. 没有管理员权限，请右键程序选择\"以管理员身份运行\"。\n"
+				"2. 系统中服务已经存在或同名服务残留，但无法删除。\n"
+				"3. 驱动程序文件路径不正确: {}\n"
+				"4. 系统服务数据库不稳定，建议重启计算机后重新尝试。\n\n"
+				"解决方法:\n"
+				"- 打开命令提示符(windows键+R，输入cmd)，右键\"以管理员身份运行\"，输入sc query，检查是否有名为'{}'的服务，如果有，右键删除该服务后重试。\n"
+				"- 尝试关闭非必要杀毒软件，例如：第三方杀毒软件或火绒等，然后重新尝试。\n\n"
+				"错误代码: 0x{:08X}", sysfile_LoadPath, DRIVER_NAME, error), error);
 		}
 	}
 
@@ -476,7 +547,13 @@ result_t KernelDriver::_startService() {
 
 	// check service status.
 	if (!QueryServiceStatus(hService, &svcStatus)) {
-		return unexpected_error(__FUNCTION__ "(): QueryServiceStatus失败。", GetLastError());
+		DWORD error = GetLastError();
+		return unexpected_error(format(
+			__FUNCTION__ "(): 无法获取服务状态。\n\n"
+			"可能的原因:\n"
+			"1. 服务正在异常，系统服务数据库不稳定\n"
+			"2. 服务权限不足，尝试关闭程序后重新尝试。\n\n"
+			"错误代码: 0x{:08X}", error), error);
 	}
 
 	// if service is running, stop it to restart. (maybe device is invalid or file cache flushed)
@@ -525,7 +602,21 @@ result_t KernelDriver::_startService() {
 
 	// start service.
 	if (!StartService(hService, 0, NULL)) {
-		auto errorObject = unexpected_error(format(__FUNCTION__ "(): StartService失败。\n\n{}", _strUserManual()), GetLastError()); fn();
+		DWORD error = GetLastError();
+		auto errorObject = unexpected_error(format(
+			__FUNCTION__ "(): 无法启动驱动服务。\n\n"
+			"可能的原因:\n"
+			"1. 驱动文件损坏或被杀毒软件隔离/删除。\n"
+			"2. 系统安全策略阻止了驱动加载(如Secure Boot、驱动签名强制)。\n"
+			"3. 权限不足，需要管理员权限。\n"
+			"4. 驱动文件路径不正确: {}\n\n"
+			"解决方法:\n"
+			"- 关闭杀毒软件(Windows Defender、360等)后重新尝试。\n"
+			"- 在BIOS中关闭Secure Boot。\n"
+			"- 检查系统是否启用了测试模式: bcdedit /set testsigning on\n"
+			"- 右键程序选择\"以管理员身份运行\"。\n"
+			"- 查看详细错误代码后在群里反馈。\n\n"
+			"{}", sysfile_LoadPath, _strUserManual()), error); fn();
 		DeleteService(hService);
 		return errorObject;
 	}
