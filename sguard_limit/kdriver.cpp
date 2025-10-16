@@ -559,7 +559,17 @@ result_t KernelDriver::_startService() {
 	// if service is running, stop it to restart. (maybe device is invalid or file cache flushed)
 	if (svcStatus.dwCurrentState != SERVICE_STOPPED && svcStatus.dwCurrentState != SERVICE_STOP_PENDING) {
 		if (!ControlService(hService, SERVICE_CONTROL_STOP, &svcStatus)) {
-			auto errorObject = unexpected_error(__FUNCTION__ "(): 无法停止当前服务，建议重启电脑。", GetLastError());
+			DWORD error = GetLastError();
+			auto errorObject = unexpected_error(format(
+				__FUNCTION__ "(): 无法停止运行中的服务。\n\n"
+				"可能的原因:\n"
+				"1. 服务正在被其他资源占用，请稍等片刻后重新尝试。\n"
+				"2. 权限不足，无法停止驱动服务。将删除该服务。\n"
+				"3. 杀毒软件设定阻止服务停止，请暂时关闭杀毒软件。\n\n"
+				"解决方法:\n"
+				"- 如果服务持续运行或被占用，请使用工具删除服务后重试。\n"
+				"- 关闭杀毒软件或防火墙后重新尝试。\n\n"
+				"错误代码: 0x{:08X}", error), error);
 			DeleteService(hService);
 			return errorObject;
 		}
@@ -577,7 +587,16 @@ result_t KernelDriver::_startService() {
 
 		if (svcStatus.dwCurrentState == SERVICE_STOP_PENDING) {
 			DeleteService(hService);
-			return unexpected_error(__FUNCTION__ "(): 等待服务停止所花费的时间过长，建议重启电脑。", 0);
+			return unexpected_error(format(
+				__FUNCTION__ "(): 等待服务停止超时。\n\n"
+				"可能的原因:\n"
+				"1. 服务无法正常停止，可能被其他程序占用。\n"
+				"2. 系统资源不足或服务存在异常。\n\n"
+				"解决方法:\n"
+				"- 重启计算机后重新尝试。\n"
+				"- 使用任务管理器结束相关进程。\n"
+				"- 使用sc delete命令手动删除服务: sc delete Hutao\n\n"
+				"错误代码: 0x{:08X}", 0), 0);
 		}
 	}
 
